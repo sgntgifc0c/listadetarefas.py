@@ -1,45 +1,43 @@
-import os
 import json
-from pathlib import Path
+import os
 from datetime import datetime
- 
+from io import TextIOWrapper
+from pathlib import Path
+
 print()
 print("- - - - - - - - - - - - - - - - - - - - -")
 print("- - - Bloco de Codigo: Tarefas      - - -")
 print("- - - - - - - - - - - - - - - - - - - - -")
 print()
- 
-MSG_DIGITE = 'Digite um número: '
-MSG_ENTER = 'Aperte enter para continuar...'
-MSG_TCHAU = 'Obrigado por usar o programa'
 
-DATE_FORMAT = '%d/%m/%Y %H:%M'
- 
-exemplo = '[{"id": "0", "titulo" : "Cortar a grama","prioridade" : "baixa","status": "pendente","origem": "e-mail","data_conclusao": "", "data_criacao": "07/11/2025 21:11"}]'
- 
- 
+MSG_DIGITE = "Digite um número: "
+MSG_ENTER = "Aperte enter para continuar..."
+MSG_TCHAU = "Obrigado por usar o programa"
+
+DATE_FORMAT = "%d/%m/%Y %H:%M"
+
+exemplo = '[{"id": "0", "titulo" : "Cortar a grama", "descricao" : "Ir para casa cortar a grama", "prioridade" : "baixa","status": "pendente","origem": "e-mail","data_conclusao": "07/11/2025 21:11", "data_criacao": "07/11/2025 21:11"}]'
+
+
 def clear():
     match os.name:
         case "nt":
             os.system("cls")
         case "posix":
             os.system("clear")
- 
+
+
 class Prioridade:
     URGENTE = "urgente"
     ALTA = "alta"
     MEDIA = "media"
     BAIXA = "baixa"
 
+    @staticmethod
     def get_sorted_list() -> list[str]:
-        return [
-            Prioridade.URGENTE,
-            Prioridade.ALTA,
-            Prioridade.MEDIA,
-            Prioridade.BAIXA
-        ]
- 
- 
+        return [Prioridade.URGENTE, Prioridade.ALTA, Prioridade.MEDIA, Prioridade.BAIXA]
+
+
 class Status:
     PENDENTE = "pendente"
     FAZENDO = "fazendo"
@@ -47,109 +45,133 @@ class Status:
     CONCLUIDA = "concluida"
     EXCLUIDA = "excluida"
 
+    @staticmethod
     def get_sorted_list() -> list[str]:
         return [
             Status.PENDENTE,
             Status.FAZENDO,
             Status.ARQUIVADA,
             Status.CONCLUIDA,
-            Status.EXCLUIDA
+            Status.EXCLUIDA,
         ]
- 
- 
+
+
 class Tarefa:
     id: int
     titulo: str
-    prioridade: Prioridade
-    status: Status
+    descricao: str
+    prioridade: str
+    status: str
     origem: str
     data_conclusao: str = ""
     data_criacao: str
- 
- 
+
+
 class ListaDeTarefas(list[Tarefa]):
     def __init__(self, json_file="") -> None:
-        if json_file == '':
+        if json_file == "":
             return
- 
+
         des_taref: list[dict] = json.loads(json_file)
- 
+
         for dado in des_taref:
             tarefa = Tarefa()
             tarefa.id = dado["id"]
             tarefa.titulo = dado["titulo"]
+            tarefa.descricao = dado["descricao"]
             tarefa.prioridade = dado["prioridade"]
             tarefa.status = dado["status"]
             tarefa.origem = dado["origem"]
             tarefa.data_criacao = dado["data_criacao"]
             tarefa.data_conclusao = dado["data_conclusao"]
- 
+
             self.append(tarefa)
- 
+
     def to_json(self) -> str:
         target = []
         for tarefa in self:
             tar = {
                 "id": tarefa.id,
                 "titulo": tarefa.titulo,
+                "descricao": tarefa.descricao,
                 "prioridade": tarefa.prioridade,
                 "status": tarefa.status,
                 "origem": tarefa.origem,
                 "data_criacao": tarefa.data_criacao,
-                "data_conclusao": tarefa.data_conclusao
+                "data_conclusao": tarefa.data_conclusao,
             }
             target.append(tar)
- 
+
         return json.dumps(target)
- 
+
+
 def gerar_id(list_tarefas: ListaDeTarefas):
     list_id = []
     for tarefa in list_tarefas:
         list_id.append(int(tarefa.id))
     return max(list_id) + 1
 
-def str_para_int(num : str) -> int | None:
+
+def str_para_int(num: str) -> int | None:
     valor = None
     try:
         valor = int(num)
-    except:
+    except Exception:
         valor = None
     return valor
 
+
 # Como eu forcei o uso de strings como forma de indentificar prioridades e status
 # essa função existe para classificar a importancia de cada tipo por ordem de lista
-def classificar_tarefas_por_lista_ordenada(list_dict : ListaDeTarefas, key : str, sorted_list : list[str]) -> ListaDeTarefas:
-    converted_list : ListaDeTarefas = []
+def classificar_tarefas_por_lista_ordenada(
+    list_dict: ListaDeTarefas, key: str, sorted_list: list[str]
+) -> ListaDeTarefas:
+    converted_list: ListaDeTarefas = ListaDeTarefas()
 
     for tarefa in list_dict:
         if not hasattr(tarefa, key):
             raise Exception("Função não encontrou a chave no dicionario")
     else:
-        pass # Language server não deixa eu ter a Intellisense nessa função se eu não colocar essa linha
+        pass  # Language server não deixa eu ter a Intellisense nessa função se eu não colocar essa linha
 
     for type in sorted_list:
         for tarefa in list_dict:
             if getattr(tarefa, key) == type:
                 converted_list.append(tarefa)
-    
+
     return converted_list
- 
- 
+
+
+def procurar_tarefas_antigas(lista_tarefas: ListaDeTarefas) -> ListaDeTarefas:
+    mod_lista = lista_tarefas
+    current = datetime.now()
+
+    for tarefa in mod_lista:
+        if tarefa.status != Status.CONCLUIDA and tarefa.data_conclusao != "":
+            continue
+        tarefa_time = datetime.strptime(tarefa.data_conclusao, DATE_FORMAT)
+        timediff = current - tarefa_time
+        if timediff.days >= 7:
+            tarefa.status = Status.ARQUIVADA
+
+    return mod_lista
+
+
 def cli_printar_tarefas(list_tarefas: ListaDeTarefas):
     clear()
     for tarefa in list_tarefas:
-        print(f'ID: {tarefa.id}')
-        print(f'Título: {tarefa.titulo}')
-        print(f'Prioridade: {tarefa.prioridade}')
-        print(f'Status: {tarefa.status}')
-        print(f'Origem: {tarefa.origem}')
-        print(f'Data de criação: {tarefa.data_criacao}')
-        print(f'Conclusão (se vazia então não esta concluída): {
-              tarefa.data_conclusao}')
+        print(f"ID: {tarefa.id}")
+        print(f"Título: {tarefa.titulo}")
+        print(f"Descrição: {tarefa.descricao}")
+        print(f"Prioridade: {tarefa.prioridade}")
+        print(f"Status: {tarefa.status}")
+        print(f"Origem: {tarefa.origem}")
+        print(f"Data de criação: {tarefa.data_criacao}")
+        print(f"Conclusão (se vazia então não esta concluída): {tarefa.data_conclusao}")
         print()
     input("\n" + MSG_ENTER)
- 
- 
+
+
 def cli_file_interface_msg():
     print("Escolha uma opção")
     print()
@@ -158,97 +180,118 @@ def cli_file_interface_msg():
     print("3 - Use um exemplo")
     print("4 - Sair do programa")
     print()
- 
- 
+
+
 def cli_file_interface() -> ListaDeTarefas:
     cli_file_interface_msg()
- 
+
     match input(MSG_DIGITE):
-        case '1':
-            file_path = input(
-                "Digite o caminho que o arquivo esta localizado: ")
+        case "1":
+            file_path = input("Digite o caminho que o arquivo esta localizado: ")
             try:
-                file = open(file_path, 'r')
+                file = open(file_path, "r")
                 file_contents = file.read()
                 file.close()
-                return ListaDeTarefas(file_contents)
+
+                mainlist = ListaDeTarefas(file_contents)
+
+                file_archive: TextIOWrapper
+                file_archive_contents: str
+                file_archive_path = file_path.replace(".json", "_archive.json")
+                file_archive_found = os.path.exists(file_archive_path)
+                if file_archive_found:
+                    file_archive = open(file_archive_path, "r")
+                    file_archive_contents = file_archive.read()
+                    file.close()
+                    list_archive = ListaDeTarefas(file_archive_contents)
+                    for tarefa in list_archive:
+                        mainlist.append(tarefa)
+
+                return mainlist
             except FileNotFoundError:
-                print('Arquivo não encontrado, voltando a interface...')
+                print("Arquivo não encontrado, voltando a interface...")
                 input(MSG_ENTER)
                 clear()
                 return cli_file_interface()
             except Exception as e:
-                print(f'Erro desconhecido: {e}')
+                print(f"Erro desconhecido: {e}")
                 input(MSG_ENTER)
                 clear()
                 return cli_file_interface()
-        case '2':
-            return ListaDeTarefas('')
-        case '3':
+        case "2":
+            return ListaDeTarefas("")
+        case "3":
             return ListaDeTarefas(exemplo)
-        case '4':
+        case "4":
             print(MSG_TCHAU)
             exit(0)
         case _:
             print("Resposta invalida, digite um número listado abaixo:")
             return cli_file_interface()
- 
- 
+
+
 def cli_adicionar_tarefa(lista: ListaDeTarefas):
     clear()
     tarefa = Tarefa()
     tarefa.titulo = input("Digite o titulo da tarefa nova: ")
+    tarefa.descricao = input("Digite a descrição da tarefa nova: ")
     while True:
-        tarefa.prioridade = input(
-            "Digite a prioridade da tarefa (Valores aceitos: urgente, alta, media, baixa): ")
-        if tarefa.prioridade in [Prioridade.URGENTE, Prioridade.ALTA, Prioridade.MEDIA, Prioridade.BAIXA]:
+        tarefa.prioridade = input(  # pyright: ignore[reportAttributeAccessIssue]
+            "Digite a prioridade da tarefa (Valores aceitos: urgente, alta, media, baixa): "
+        )
+        if tarefa.prioridade in Prioridade.get_sorted_list():
             break
         else:
             print("Valor invalido digite denovo")
- 
+
     tarefa.origem = input(
-        "Digite a origem da tarefa (Pode ser email, telefone, etc...): ")
-    tarefa.status = Status.PENDENTE
+        "Digite a origem da tarefa (Pode ser email, telefone, etc...): "
+    )
+    tarefa.status = Status.PENDENTE  # pyright: ignore[reportAttributeAccessIssue]
     tarefa.id = gerar_id(lista)
 
     data_agora = datetime.now()
     tarefa.data_criacao = data_agora.strftime(DATE_FORMAT)
- 
+
     print("Tarefa adicionada!")
     input("Aperte enter para continuar...")
     lista.append(tarefa)
     return cli_lista_interface(lista)
- 
- 
+
+
 def cli_visualizar_tarefas(lista: ListaDeTarefas):
-    lista_classificada = classificar_tarefas_por_lista_ordenada(lista, "prioridade", Prioridade.get_sorted_list())
-    lista_filtrada = []
+    lista_classificada = classificar_tarefas_por_lista_ordenada(
+        lista, "prioridade", Prioridade.get_sorted_list()
+    )
+    lista_filtrada = ListaDeTarefas()
 
     for tarefa in lista_classificada:
         if tarefa.status == Status.PENDENTE:
             lista_filtrada.append(tarefa)
- 
+
     cli_printar_tarefas(lista_filtrada)
- 
+
     return cli_lista_interface(lista)
- 
- 
+
+
 def cli_mudar_estado_tarefa(lista: ListaDeTarefas):
     lista_nova = lista
- 
+
     id_select = input(
-        'Digite a ID da tarefa que queira modificar (deve ser número inteiro): ')
+        "Digite a ID da tarefa que queira modificar (deve ser número inteiro): "
+    )
     id_int = str_para_int(id_select)
     if id_int is None:
-        print('ID digitado invalido, escreva um número inteiro.')
+        print("ID digitado invalido, escreva um número inteiro.")
         return cli_mudar_estado_tarefa(lista)
 
     for tarefa in range(0, len(lista_nova)):
         if lista_nova[tarefa].id == id_select or lista_nova[tarefa].id == id_int:
-            print(f'ID Encontrada: {lista_nova[id_int].titulo}')
+            print(f"ID Encontrada: {lista_nova[id_int].titulo}")
             while True:
                 status_mod = input(
-                    "Escolha um dos estados que deseja modificar na tarefa (Opções: concluida, pendente, fazendo, arquivada, excluida): ")
+                    "Escolha um dos estados que deseja modificar na tarefa (Opções: concluida, pendente, fazendo, arquivada, excluida): "
+                )
                 if status_mod in Status.get_sorted_list():
                     if status_mod == Status.CONCLUIDA:
                         data = datetime.now()
@@ -263,28 +306,30 @@ def cli_mudar_estado_tarefa(lista: ListaDeTarefas):
                     print("Valor errado, Digite denovo")
             break
     else:
-        print('ID não encontrado, voltando a interface')
+        print("ID não encontrado, voltando a interface")
         input(MSG_ENTER)
- 
+
     return cli_lista_interface(lista_nova)
- 
- 
+
+
 def cli_mudar_prioridade_tarefa(lista):
     lista_nova = lista
- 
+
     id_select = input(
-        'Digite a ID da tarefa que queira modificar (deve ser número inteiro): ')
+        "Digite a ID da tarefa que queira modificar (deve ser número inteiro): "
+    )
     id_int = str_para_int(id_select)
     if id_int is None:
-        print('ID digitado invalido, escreva um número inteiro.')
+        print("ID digitado invalido, escreva um número inteiro.")
         return cli_mudar_prioridade_tarefa(lista)
- 
+
     for tarefa in range(0, len(lista_nova)):
         if lista_nova[tarefa].id == id_select or lista_nova[tarefa].id == id_int:
-            print(f'ID Encontrada: {lista_nova[id_int].titulo}')
+            print(f"ID Encontrada: {lista_nova[id_int].titulo}")
             while True:
                 prioridade_mod = input(
-                    "Escolha uma prioridade que deseja designar para a tarefa (Opções: urgente, alta, media, baixa): ")
+                    "Escolha uma prioridade que deseja designar para a tarefa (Opções: urgente, alta, media, baixa): "
+                )
                 if prioridade_mod in Prioridade.get_sorted_list():
                     lista_nova[id_int].prioridade = prioridade_mod
                     print("Lista De Tarefas atualizada")
@@ -294,33 +339,35 @@ def cli_mudar_prioridade_tarefa(lista):
                     print("Valor errado, Digite denovo")
             break
     else:
-        print('ID não encontrado, voltando a interface')
+        print("ID não encontrado, voltando a interface")
         input(MSG_ENTER)
- 
+
     return cli_lista_interface(lista_nova)
- 
- 
+
+
+"""
 def cli_limpar_tarefas(lista: ListaDeTarefas):
     lista_nova = lista
-    lista_tar: ListaDeTarefas = []
+    lista_tar: ListaDeTarefas = ListaDeTarefas()
     clear()
- 
+
     for tarefa in lista_nova:
         if tarefa.status == Status.EXCLUIDA:
             lista_tar.append(tarefa)
- 
-    print('As seguintes tarefas irão ser deletadas: ')
+
+
+    print("As seguintes tarefas irão ser deletadas: ")
     for tar in lista_tar:
-        print('\n')
-        print(f'Titulo: {tar.titulo}')
-        print(f'ID: {tar.id}')
-        print(f'Data de Conclusão: {tar.data_conclusao}')
- 
+        print("\n")
+        print(f"Titulo: {tar.titulo}")
+        print(f"ID: {tar.id}")
+        print(f"Data de Conclusão: {tar.data_conclusao}")
+
     match input("Deseja continuar? (Sim ou Não): "):
-        case 'Sim' | 'sim' | 's':
+        case "Sim" | "sim" | "s":
             for tar in lista_tar:
                 lista_nova.remove(tar)
-        case 'Não' | 'Nao' | 'nao' | 'n':
+        case "Não" | "Nao" | "nao" | "n":
             print("Voltando a interface...")
             input(MSG_ENTER)
             pass
@@ -328,40 +375,44 @@ def cli_limpar_tarefas(lista: ListaDeTarefas):
             print("Resposta invalida, responda denovo")
             input(MSG_ENTER)
             return cli_limpar_tarefas(lista)
- 
+
     return cli_lista_interface(lista_nova)
- 
- 
+"""
+
+
 def cli_salvar_arquivo(lista: ListaDeTarefas):
     clear()
-    match input('Pretende salvar o arquivo? (Opções: Sim, Não): '):
-        case 'Sim' | 'sim' | 's':
+    match input("Pretende salvar o arquivo? (Opções: Sim, Não): "):
+        case "Sim" | "sim" | "s":
             caminho = input(
-                'Qual caminho você deseja salvar o programa? (Digite . para escolher a pasta que o terminal reside): ')
+                "Qual caminho você deseja salvar o programa? (Digite . para escolher a pasta que o terminal reside): "
+            )
 
             nome = input(
-                'Qual nome tu deseja aplicar para o arquivo? (inclua a extensão tambem): ')
+                "Qual nome tu deseja aplicar para o arquivo? (inclua a extensão tambem): "
+            )
             try:
-                cam_path = Path(caminho + '\\')
+                cam_path = Path(caminho + "\\")
                 cam_path.mkdir(parents=True, exist_ok=True)
-                file = open(caminho + '\\' + nome, 'w')
+                file = open(caminho + "\\" + nome, "w")
                 file.write(lista.to_json())
                 file.close()
             except Exception as e:
-                print(f'Erro inesperado: {e}')
+                print(f"Erro inesperado: {e}")
                 print("Escreva denovo")
                 input(MSG_ENTER)
                 return cli_salvar_arquivo(lista)
             print(MSG_TCHAU)
             return exit(0)
-        case 'Não' | 'Nao' | 'nao' | 'n':
+        case "Não" | "Nao" | "nao" | "n":
             print(MSG_TCHAU)
             return exit(0)
         case _:
             print("Resposta invalida, responda denovo")
             input(MSG_ENTER)
             return cli_salvar_arquivo(lista)
- 
+
+
 def cli_lista_interface_msg():
     print("O que deseja fazer com o arquivo?")
     print()
@@ -370,41 +421,42 @@ def cli_lista_interface_msg():
     print("3 - Modificar estado de uma tarefa")
     print("4 - Modificar prioridade de uma tarefa")
     print("5 - Listar todas as tarefas")
-    print("6 - Limpar Tarefas Excluidas")
-    print("7 - Sair do programa")
+    print("6 - Sair do programa")
     print()
- 
- 
+
+
 def cli_lista_interface(lista: ListaDeTarefas):
     clear()
     cli_lista_interface_msg()
- 
+
     match input(MSG_DIGITE):
-        case '1':
+        case "1":
             return cli_adicionar_tarefa(lista)
-        case '2':
+        case "2":
             return cli_visualizar_tarefas(lista)
-        case '3':
+        case "3":
             return cli_mudar_estado_tarefa(lista)
-        case '4':
+        case "4":
             return cli_mudar_prioridade_tarefa(lista)
-        case '5':
+        case "5":
             cli_printar_tarefas(lista)
             return cli_lista_interface(lista)
-        case '6':
-            return cli_limpar_tarefas(lista)
-        case '7':
+        # case "6":
+        #    return cli_limpar_tarefas(lista)
+        case "6":
             return cli_salvar_arquivo(lista)
         case _:
             print("Opção Invalida")
- 
- 
+
+
 def tarefas():
     list_tarefas: ListaDeTarefas
- 
+
     list_tarefas = cli_file_interface()
- 
-    list_tarefas = cli_lista_interface(list_tarefas)
- 
- 
+
+    list_tarefas = procurar_tarefas_antigas(list_tarefas)
+
+    list_tarefas = cli_lista_interface(list_tarefas)  # pyright: ignore[reportAssignmentType]
+
+
 tarefas()
